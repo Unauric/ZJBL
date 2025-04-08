@@ -14,9 +14,12 @@ CHANNEL_ID = int(os.getenv("CHANNEL_ID"))  # Must be cast to int
 TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS")
 
 app = Flask(__name__)
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
 
+# ====== DISCORD INTENTS ======
+# Enable all required intents, including privileged 'message_content'
+intents = discord.Intents.default()
+intents.message_content = True  # This is the privileged intent required
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -33,9 +36,15 @@ def webhook():
                         f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
                         f"[View on Solscan]({tx_link})"
                     )
-                    channel = await bot.fetch_channel(CHANNEL_ID)
-                    if channel:
-                        await channel.send(msg)
+                    try:
+                        channel = await bot.fetch_channel(CHANNEL_ID)
+                        if channel:
+                            await channel.send(msg)
+                            print(f"✅ Message sent to channel {CHANNEL_ID}")
+                        else:
+                            print(f"⚠️ Channel not found: {CHANNEL_ID}")
+                    except Exception as e:
+                        print(f"❌ Error sending message: {e}")
 
     asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
     return {"status": "ok"}, 200
@@ -47,10 +56,19 @@ def run_flask():
 
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
-    channel = bot.get_channel(CHANNEL_ID)
-    print("🔎 Found channel:", channel)
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    try:
+        channel = await bot.fetch_channel(CHANNEL_ID)
+        if channel:
+            print(f"🔎 Found channel: {channel.name} (ID: {channel.id})")
+        else:
+            print(f"⚠️ Channel not found: {CHANNEL_ID}")
+    except Exception as e:
+        print(f"❌ Error fetching channel: {e}")
 
 
 threading.Thread(target=run_flask).start()
-bot.run(DISCORD_TOKEN)
+try:
+    bot.run(DISCORD_TOKEN)
+except Exception as e:
+    print(f"❌ Error running bot: {e}")
