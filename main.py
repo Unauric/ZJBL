@@ -6,7 +6,6 @@ import asyncio
 import os
 from dotenv import load_dotenv
 
-
 print("🚀 Starting bot...", flush=True)
 
 load_dotenv()  # Load .env variables
@@ -23,11 +22,9 @@ intents.guilds = True
 intents.message_content = True  # Important for reading/sending messages
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-client = commands.Bot(command_prefix="!", intents=intents)
 
 # ====== FLASK SETUP ======
 app = Flask(__name__)
-
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -58,21 +55,19 @@ def webhook():
 
 # ====== BOT EVENTS ======
 @bot.event
-@client.event
 async def on_ready():
-    print(f"✅ Logged in as {client.user} (ID: {client.user.id})", flush=True)
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
 
-    guild = discord.utils.get(client.guilds, name=GUILD_NAME)
+    guild = discord.utils.get(bot.guilds, name="YOUR_GUILD_NAME")  # Replace with actual guild name
     if guild:
         print(f"🔎 Found guild: {guild.name} (ID: {guild.id})", flush=True)
-        channel = discord.utils.get(guild.text_channels, name=CHANNEL_NAME)
+        channel = discord.utils.get(guild.text_channels, name="YOUR_CHANNEL_NAME")  # Replace with actual channel name
         if channel:
             print(f"💬 Found channel: {channel.name} (ID: {channel.id})", flush=True)
         else:
-            print(f"⚠️ Channel '{CHANNEL_NAME}' not found in guild '{GUILD_NAME}'", flush=True)
+            print(f"⚠️ Channel not found", flush=True)
     else:
-        print(f"⚠️ Guild '{GUILD_NAME}' not found", flush=True)
-
+        print(f"⚠️ Guild not found", flush=True)
 
 
 # ====== FLASK IN THREAD ======
