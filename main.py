@@ -1,159 +1,70 @@
 import discord
-from discord.ext import commands
-from flask import Flask, request
-import threading
+from discord.ext import commands, tasks
+import requests
 import asyncio
 import os
 from dotenv import load_dotenv
-import requests
+import time
 
-print("🚀 Starting bot...", flush=True)
+# Load environment variables
+load_dotenv()
 
-load_dotenv()  # Load .env variables
-
-# ====== CONFIGURATION ======
+# Configuration
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS")
+SOLSCAN_API_URL = "https://public-api.solscan.io/transaction"  # Solscan API endpoint (for example)
 
-# ====== DISCORD SETUP ======
+# Initialize Discord bot
 intents = discord.Intents.default()
 intents.messages = True
 intents.guilds = True
-intents.message_content = True  # Important for reading/sending messages
-
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ====== FLASK SETUP ======
-app = Flask(__name__)
+# Polling interval in seconds (e.g., 60 seconds)
+POLLING_INTERVAL = 60
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    print("📬 Webhook received!")  # Confirm receipt of webhook
-
+# ====== Polling Task to Check Transactions ======
+@tasks.loop(seconds=POLLING_INTERVAL)
+async def check_new_transactions():
+    print("🔄 Checking for new transactions...")
     try:
-        # Read incoming data
-        data = request.get_json(force=True)
-        print("📬 Webhook data:", data)  # Print out the incoming data for debugging
+        # Make an API request to Solscan (or Solana RPC) to fetch transactions
+        response = requests.get(SOLSCAN_API_URL, params={"token": TOKEN_ADDRESS, "limit": 10})
         
-        # Check if 'transactions' are present in the data
-        if 'transactions' not in data:
-            print("⚠️ No transactions found in the webhook data.")
-            return {"status": "error", "message": "No transactions found"}, 400
-
-        # Process the transactions
-        for tx in data.get("transactions", []):
-            print(f"Processing transaction: {tx}")  # Debug: print each transaction
-            for event in tx.get("events", {}).get("tokenTransfers", []):
-                print(f"Processing token transfer event: {event}")  # Debug: print each token transfer event
-                if event.get("tokenAddress") == TOKEN_ADDRESS:
-                    print("✅ Found matching token address!")  # Token address matched
-                    buyer = event["fromUserAccount"]
-                    amount = int(event["amount"]) / (10 ** event["decimals"])
-                    tx_link = f"https://solscan.io/tx/{tx['signature']}"
-                    msg = (
-                        f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
-                        f"[View on Solscan]({tx_link})"
-                    )
-
-                    # Ensure we're using an async method correctly to send the message
-                    async def send_message():
-                        channel = await bot.fetch_channel(CHANNEL_ID)
-                        await channel.send(msg)
-                        print(f"✅ Sent message to channel {CHANNEL_ID}")
-                    
-                    # Ensure we're running this in the correct loop
-                    asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
-
-        return {"status": "ok"}, 200
-    except Exception as e:
-        print(f"❌ Error processing webhook: {e}")
-        return {"status": "error", "message": str(e)}, 500
-
-# ====== BOT EVENTS ======
-@bot.event
-async def on_ready():
-    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
-
-    guild = discord.utils.get(bot.guilds, name="$MAYBACH420")  # Replace with actual guild name
-    if guild:
-        print(f"🔎 Found guild: {guild.name} (ID: {guild.id})", flush=True)
-        channel = discord.utils.get(guild.text_channels, name="new-buy")  # Replace with actual channel name
-        if channel:
-            print(f"💬 Found channel: {channel.name} (ID: {channel.id})", flush=True)
-        else:
-            print(f"⚠️ Channel not found", flush=True)
-    else:
-        print(f"⚠️ Guild not found", flush=True)
-
-# ====== FETCH AND SEND TRANSACTIONS ======
-def fetch_and_send_transactions():
-    # Define your Solscan token address and endpoint
-    SOLSCAN_API_URL = f"https://api.solscan.io/account/txs?account={TOKEN_ADDRESS}&limit=10"
-
-    # Headers to bypass Cloudflare or other protection mechanisms
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-
-    try:
-        # Fetch transaction data from Solscan with headers
-        response = requests.get(SOLSCAN_API_URL, headers=headers)
-
-        # Log the status code and the raw response content for debugging
-        print(f"Solscan API Response Status Code: {response.status_code}")
-        print(f"Solscan API Response Content: {response.text}")
-        
-        # If the request was successful, try to parse the JSON response
         if response.status_code == 200:
             transactions = response.json().get("data", [])
+            for tx in transactions:
+                signature = tx.get("signature")
+                token_transfers = tx.get("tokenTransfers", [])
+
+                for transfer in token_transfers:
+                    if transfer.get("tokenAddress") == TOKEN_ADDRESS:
+                        # Process the token transfer event
+                        buyer = transfer.get("fromUserAccount")
+                        amount = int(transfer.get("amount")) / (10 ** transfer.get("decimals"))
+                        tx_link = f"https://solscan.io/tx/{signature}"
+
+                        msg = (
+                            f"🚀 {amount:.2f} YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
+                            f"[View on Solscan]({tx_link})"
+                        )
+                        # Send the message to the Discord channel
+                        channel = await bot.fetch_channel(CHANNEL_ID)
+                        await channel.send(msg)
+                        print(f"✅ Sent message for transaction {signature}")
         else:
-            print(f"❌ Error: Solscan API returned an error with status code {response.status_code}")
-            return
-        
-        # Sample structure to hold formatted data
-        formatted_transactions = []
-
-        for tx in transactions:
-            # Checking if it's a token transfer transaction
-            for event in tx.get("events", {}).get("tokenTransfers", []):
-                if event.get("tokenAddress") == TOKEN_ADDRESS:
-                    formatted_tx = {
-                        "signature": tx["signature"],
-                        "events": {
-                            "tokenTransfers": [
-                                {
-                                    "tokenAddress": event["tokenAddress"],
-                                    "fromUserAccount": event["fromUserAccount"],
-                                    "amount": event["amount"],
-                                    "decimals": event["decimals"]
-                                }
-                            ]
-                        }
-                    }
-                    formatted_transactions.append(formatted_tx)
-
-        # Now send the formatted transactions to the webhook
-        if formatted_transactions:
-            WEBHOOK_URL = "https://zjbl.onrender.com/webhook"
-            response = requests.post(WEBHOOK_URL, json={"transactions": formatted_transactions})
-
-            # Print the response for debugging
-            print(f"Webhook Response Status Code: {response.status_code}")
-            print(f"Webhook Response Text: {response.text}")
-        else:
-            print("⚠️ No matching transactions found to send to webhook.")
-
+            print(f"❌ Failed to fetch transactions: {response.status_code}")
+    
     except Exception as e:
-        print(f"❌ Error occurred while fetching or sending transactions: {e}")
+        print(f"❌ Error while checking transactions: {e}")
 
-# ====== FLASK IN THREAD ======
-def run_flask():
-    app.run(host="0.0.0.0", port=5000)
-
-# Start Flask in a separate thread to handle incoming webhooks
-threading.Thread(target=run_flask).start()
+# Start the polling task when the bot is ready
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    check_new_transactions.start()
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
-
