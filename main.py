@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands, tasks
 import requests
-import asyncio
 import os
 from dotenv import load_dotenv
 
@@ -76,7 +75,13 @@ async def check_new_transactions():
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-    check_new_transactions.start()  # Ensure the polling task starts when the bot is ready
+    
+    # Check if the polling task has started
+    if not check_new_transactions.is_running():
+        print("🔄 Starting the polling task for transactions.")
+        check_new_transactions.start()
+    else:
+        print("⚠️ Polling task is already running.")
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
