@@ -61,7 +61,7 @@ async def on_ready():
     guild = discord.utils.get(bot.guilds, name="$MAYBACH420")  # Replace with actual guild name
     if guild:
         print(f"🔎 Found guild: {guild.name} (ID: {guild.id})", flush=True)
-        channel = discord.utils.get(guild.text_channels, name="YOUR_CHANNEL_NAME")  # Replace with actual channel name
+        channel = discord.utils.get(guild.text_channels, name="how-to-buy")  # Replace with actual channel name
         if channel:
             print(f"💬 Found channel: {channel.name} (ID: {channel.id})", flush=True)
         else:
