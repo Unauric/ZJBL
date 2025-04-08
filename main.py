@@ -6,6 +6,9 @@ import asyncio
 import os
 from dotenv import load_dotenv
 
+
+print("🚀 Starting bot...", flush=True)
+
 load_dotenv()  # Load .env variables
 
 # ====== CONFIGURATION ======
@@ -54,13 +57,21 @@ def webhook():
 
 # ====== BOT EVENTS ======
 @bot.event
+@client.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
-    try:
-        channel = await bot.fetch_channel(CHANNEL_ID)
-        print(f"🔎 Found channel: {channel.name}")
-    except Exception as e:
-        print(f"❌ Error fetching channel: {e}")
+    print(f"✅ Logged in as {client.user} (ID: {client.user.id})", flush=True)
+
+    guild = discord.utils.get(client.guilds, name=GUILD_NAME)
+    if guild:
+        print(f"🔎 Found guild: {guild.name} (ID: {guild.id})", flush=True)
+        channel = discord.utils.get(guild.text_channels, name=CHANNEL_NAME)
+        if channel:
+            print(f"💬 Found channel: {channel.name} (ID: {channel.id})", flush=True)
+        else:
+            print(f"⚠️ Channel '{CHANNEL_NAME}' not found in guild '{GUILD_NAME}'", flush=True)
+    else:
+        print(f"⚠️ Guild '{GUILD_NAME}' not found", flush=True)
+
 
 
 # ====== FLASK IN THREAD ======
