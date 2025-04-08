@@ -75,13 +75,16 @@ async def check_new_transactions():
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-    
-    # Check if the polling task has started
-    if not check_new_transactions.is_running():
-        print("🔄 Starting the polling task for transactions.")
-        check_new_transactions.start()
-    else:
-        print("⚠️ Polling task is already running.")
+
+    # Start the polling task explicitly
+    try:
+        if not check_new_transactions.is_running():
+            print("🔄 Starting the polling task for transactions.")
+            check_new_transactions.start()
+        else:
+            print("⚠️ Polling task is already running.")
+    except Exception as e:
+        print(f"❌ Failed to start the polling task: {e}")
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
