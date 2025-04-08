@@ -5,6 +5,7 @@ import threading
 import asyncio
 import os
 from dotenv import load_dotenv
+import requests
 
 print("🚀 Starting bot...", flush=True)
 
@@ -47,9 +48,20 @@ def webhook():
                 print(f"Processing token transfer event: {event}")  # Debug: print each token transfer event
                 if event.get("tokenAddress") == TOKEN_ADDRESS:
                     print("✅ Found matching token address!")  # Token address matched
+                    
+                    # Fetch transaction details from Solscan
+                    tx_signature = tx['signature']
+                    solscan_url = f"https://api.solscan.io/transaction?tx={tx_signature}"
+                    response = requests.get(solscan_url)
+                    
+                    if response.status_code == 200:
+                        tx_data = response.json()  # Transaction data from Solscan
+                        print(f"Transaction data: {tx_data}")
+                    
+                    # Proceed with the rest of your logic
                     buyer = event["fromUserAccount"]
                     amount = int(event["amount"]) / (10 ** event["decimals"])
-                    tx_link = f"https://solscan.io/tx/{tx['signature']}"
+                    tx_link = f"https://solscan.io/tx/{tx_signature}"
                     msg = (
                         f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
                         f"[View on Solscan]({tx_link})"
