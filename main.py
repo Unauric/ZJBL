@@ -28,39 +28,33 @@ app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    print("Received a POST request at /webhook")  # Log to verify if the request is reaching the server
-    data = request.get_json(force=True)
-    print("📬 Webhook received:", data)  # Print all received data
+    print("📬 Webhook received!")  # Add logging here to confirm receipt
 
-    async def send_message():
-        try:
-            for tx in data.get("transactions", []):
-                print(f"Processing transaction: {tx}")  # Debug: print transaction
-                for event in tx.get("events", {}).get("tokenTransfers", []):
-                    print(f"Processing token transfer event: {event}")  # Debug: print token transfer
-                    if event.get("tokenAddress") == TOKEN_ADDRESS:
-                        buyer = event["fromUserAccount"]
-                        amount = int(event["amount"]) / (10 ** event["decimals"])
-                        tx_link = f"https://solscan.io/tx/{tx['signature']}"
-                        msg = (
-                            f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
-                            f"[View on Solscan]({tx_link})"
-                        )
-
-                        # Debug: Print to check if the correct channel is fetched
-                        try:
-                            channel = await bot.fetch_channel(CHANNEL_ID)
-                            print(f"Fetched channel: {channel.name} (ID: {channel.id})")  # Debug: Check the fetched channel
-                            if not channel.permissions_for(bot.user).send_messages:
-                                print("❌ Bot does not have permission to send messages in this channel.")
-                            else:
-                                await channel.send(msg)
-                                print(f"✅ Sent message to channel {CHANNEL_ID}")
-                        except Exception as e:
-                            print(f"❌ Error fetching channel: {e}")
-
-        except Exception as e:
-            print(f"❌ Error processing webhook: {e}")
+    try:
+        data = request.get_json(force=True)
+        print("📬 Webhook data:", data)  # Debug: Print the entire incoming data
+        
+        # Add further debugging inside your transaction parsing loop
+        for tx in data.get("transactions", []):
+            print(f"Processing transaction: {tx}")  # Debug: print each transaction
+            for event in tx.get("events", {}).get("tokenTransfers", []):
+                print(f"Processing token transfer event: {event}")  # Debug: print each token transfer event
+                if event.get("tokenAddress") == TOKEN_ADDRESS:
+                    print("✅ Found matching token address!")  # Debug: Token address matched
+                    buyer = event["fromUserAccount"]
+                    amount = int(event["amount"]) / (10 ** event["decimals"])
+                    tx_link = f"https://solscan.io/tx/{tx['signature']}"
+                    msg = (
+                        f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
+                        f"[View on Solscan]({tx_link})"
+                    )
+                    channel = await bot.fetch_channel(CHANNEL_ID)
+                    await channel.send(msg)
+                    print(f"✅ Sent message to channel {CHANNEL_ID}")
+        return {"status": "ok"}, 200
+    except Exception as e:
+        print(f"❌ Error processing webhook: {e}")
+        return {"status": "error", "message": str(e)}, 500
 
     asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
     return {"status": "ok"}, 200
