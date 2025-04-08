@@ -12,8 +12,8 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS")
-SOLSCAN_API_URL = os.getenv("SOLSCAN_API_URL")  # Now configurable from .env
-POLLING_INTERVAL = 60  # Interval in seconds
+SOLSCAN_API_URL = os.getenv("SOLSCAN_API_URL")  # Configurable from .env
+POLLING_INTERVAL = 60  # Polling interval in seconds
 
 # Initialize Discord bot
 intents = discord.Intents.default()
@@ -33,7 +33,7 @@ async def check_new_transactions():
         transactions = response.json().get("data", [])
         
         if transactions:
-            print(f"Found {len(transactions)} transactions.")
+            print(f"📡 Found {len(transactions)} transactions.")
             for tx in transactions:
                 signature = tx.get("signature")
                 if signature in processed_signatures:
@@ -64,13 +64,25 @@ async def check_new_transactions():
 
 @bot.event
 async def on_ready():
-    print(f"✅ Bot logged in as {bot.user}.")
+    print(f"✅ Bot logged in as {bot.user} (ID: {bot.user.id})")
     try:
+        channel = await bot.fetch_channel(CHANNEL_ID)
+        if channel:
+            print(f"🔎 Found channel: {channel.name} (ID: {channel.id})")
+        else:
+            print(f"⚠️ Channel not found with ID {CHANNEL_ID}")
+        
         if not check_new_transactions.is_running():
             print("🔄 Starting transaction polling task.")
             check_new_transactions.start()
     except Exception as e:
-        print(f"❌ Failed to start the polling task: {e}")
+        print(f"❌ Error in on_ready(): {e}")
+
+async def start_polling_task():
+    await bot.wait_until_ready()
+    print("✅ Bot is ready. Starting polling task.")
+    if not check_new_transactions.is_running():
+        check_new_transactions.start()
 
 print("🛠️ Starting the bot...")
 bot.run(DISCORD_TOKEN)
