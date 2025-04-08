@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands, tasks
 import requests
 import os
+import asyncio
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -11,81 +12,65 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS")
-SOLSCAN_API_URL = "https://public-api.solscan.io/transaction"  # Solscan API endpoint
+SOLSCAN_API_URL = os.getenv("SOLSCAN_API_URL")  # Now configurable from .env
+POLLING_INTERVAL = 60  # Interval in seconds
 
 # Initialize Discord bot
 intents = discord.Intents.default()
-intents.messages = True
-intents.guilds = True
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Polling interval in seconds (e.g., 60 seconds)
-POLLING_INTERVAL = 60
+# Track processed transaction signatures
+processed_signatures = set()
 
-# ====== Polling Task to Check Transactions ======
 @tasks.loop(seconds=POLLING_INTERVAL)
 async def check_new_transactions():
-    print("🔄 Checking for new transactions...")  # Log to verify the task is being executed
+    print("🔄 Checking for new transactions...")
     try:
-        # Make an API request to Solscan (or Solana RPC) to fetch transactions
         params = {"token": TOKEN_ADDRESS, "limit": 10}
-        response = requests.get(SOLSCAN_API_URL, params=params)
-
-        # Check if the response status code is 200 (successful)
-        if response.status_code == 200:
-            print("📡 Successfully fetched transactions.")
-            transactions = response.json().get("data", [])
-            
-            if transactions:
-                print(f"Found {len(transactions)} transactions.")  # Log the number of transactions found
-                for tx in transactions:
-                    signature = tx.get("signature")
-                    token_transfers = tx.get("tokenTransfers", [])
-
-                    # Log the token transfers for this transaction
-                    print(f"Processing transaction {signature} with {len(token_transfers)} token transfers.")
-
-                    for transfer in token_transfers:
-                        if transfer.get("tokenAddress") == TOKEN_ADDRESS:
-                            # Process the token transfer event
-                            buyer = transfer.get("fromUserAccount")
-                            amount = int(transfer.get("amount")) / (10 ** transfer.get("decimals"))
-                            tx_link = f"https://solscan.io/tx/{signature}"
-
-                            # Construct the message
-                            msg = (
-                                f"🚀 {amount:.2f} YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
-                                f"[View on Solscan]({tx_link})"
-                            )
-
-                            # Send the message to the Discord channel
+        response = requests.get(SOLSCAN_API_URL, params=params, timeout=10)
+        response.raise_for_status()  # Raise an error for HTTP issues
+        transactions = response.json().get("data", [])
+        
+        if transactions:
+            print(f"Found {len(transactions)} transactions.")
+            for tx in transactions:
+                signature = tx.get("signature")
+                if signature in processed_signatures:
+                    continue  # Skip already processed transactions
+                
+                processed_signatures.add(signature)
+                token_transfers = tx.get("tokenTransfers", [])
+                for transfer in token_transfers:
+                    if transfer.get("tokenAddress") == TOKEN_ADDRESS:
+                        buyer = transfer.get("fromUserAccount")
+                        amount = int(transfer.get("amount")) / (10 ** transfer.get("decimals"))
+                        tx_link = f"https://solscan.io/tx/{signature}"
+                        msg = (
+                            f"🚀 {amount:.2f} YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
+                            f"[View on Solscan]({tx_link})"
+                        )
+                        try:
                             channel = await bot.fetch_channel(CHANNEL_ID)
                             await channel.send(msg)
                             print(f"✅ Sent message for transaction {signature}")
-            else:
-                print("🔄 No transactions found.")
+                            await asyncio.sleep(1)  # Prevent rate limiting
+                        except discord.HTTPException as e:
+                            print(f"❌ Error sending message: {e}")
         else:
-            print(f"❌ Failed to fetch transactions. Status Code: {response.status_code}")
-            print("Response Content:", response.text)  # Log the response content for debugging
-    except Exception as e:
+            print("🔄 No transactions found.")
+    except requests.exceptions.RequestException as e:
         print(f"❌ Error while checking transactions: {e}")
 
-# Start the polling task when the bot is ready
 @bot.event
 async def on_ready():
-    print(f"✅ Bot logged in as {bot.user}. (ID: {bot.user.id})")
-    
-    # Ensure polling task starts only once and is triggered correctly
+    print(f"✅ Bot logged in as {bot.user}.")
     try:
         if not check_new_transactions.is_running():
-            print("🔄 Starting the polling task for transactions.")
+            print("🔄 Starting transaction polling task.")
             check_new_transactions.start()
-        else:
-            print("⚠️ Polling task is already running.")
     except Exception as e:
         print(f"❌ Failed to start the polling task: {e}")
 
-# Run the bot
-print("🛠️ Running the bot...")
+print("🛠️ Starting the bot...")
 bot.run(DISCORD_TOKEN)
