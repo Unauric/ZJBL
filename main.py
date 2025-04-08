@@ -1,114 +1,96 @@
-import requests
-import time
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+from flask import Flask, request
+import threading
+import asyncio
 import os
+from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+print("🚀 Starting bot...", flush=True)
+
+load_dotenv()  # Load .env variables
 
 # ====== CONFIGURATION ======
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-TOKEN_ADDRESS = "Dj3wnBYJZGnzMkGGyUqLbtyU1bt4CaFF9mES44Nhpump"  # Replace with your coin's Solana token address
+TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS")
 
 # ====== DISCORD SETUP ======
 intents = discord.Intents.default()
 intents.messages = True
 intents.guilds = True
-intents.message_content = True
+intents.message_content = True  # Important for reading/sending messages
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Solana API URL
-SOLANA_API_URL = "https://api.mainnet-beta.solana.com"
+# ====== FLASK SETUP ======
+app = Flask(__name__)
 
-# Function to check for new transactions related to your token address
-def check_solana_transactions():
-    headers = {
-        "Content-Type": "application/json"
-    }
-
-    # Request body for checking recent transactions involving the token address
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getConfirmedSignaturesForAddress2",
-        "params": [TOKEN_ADDRESS, {"limit": 5}]  # Limit to 5 recent transactions
-    }
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    print("📬 Webhook received!")  # Confirm receipt of webhook
 
     try:
-        response = requests.post(SOLANA_API_URL, json=payload, headers=headers)
-        transactions = response.json().get('result', [])
-        if transactions:
-            for tx in transactions:
-                tx_signature = tx['signature']
-                print(f"New transaction found: {tx_signature}")
-                check_transaction_details(tx_signature)
-    except Exception as e:
-        print(f"Error checking Solana transactions: {e}")
-
-# Function to get details about a specific transaction
-def check_transaction_details(signature):
-    headers = {
-        "Content-Type": "application/json"
-    }
-
-    # Request body for checking transaction details
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getTransaction",
-        "params": [signature]
-    }
-
-    try:
-        response = requests.post(SOLANA_API_URL, json=payload, headers=headers)
-        transaction_details = response.json().get('result', {})
-
-        if not transaction_details:
-            print("No transaction details found.")
-            return
+        # Read incoming data
+        data = request.get_json(force=True)
+        print("📬 Webhook data:", data)  # Print out the incoming data for debugging
         
-        # Extracting transaction details
-        transaction_meta = transaction_details.get('meta', {})
-        token_balances = transaction_meta.get('postTokenBalances', [])
+        # Check if 'transactions' are present in the data
+        if 'transactions' not in data:
+            print("⚠️ No transactions found in the webhook data.")
+            return {"status": "error", "message": "No transactions found"}, 400
 
-        for balance in token_balances:
-            if balance.get('mint') == TOKEN_ADDRESS:
-                amount = balance.get('uiAmount')  # Token amount
-                buyer = transaction_details['transaction']['message']['accountKeys'][1]  # Account that made the transfer
+        # Process the transactions
+        for tx in data.get("transactions", []):
+            print(f"Processing transaction: {tx}")  # Debug: print each transaction
+            for event in tx.get("events", {}).get("tokenTransfers", []):
+                print(f"Processing token transfer event: {event}")  # Debug: print each token transfer event
+                if event.get("tokenAddress") == TOKEN_ADDRESS:
+                    print("✅ Found matching token address!")  # Token address matched
+                    buyer = event["fromUserAccount"]
+                    amount = int(event["amount"]) / (10 ** event["decimals"])
+                    tx_link = f"https://solscan.io/tx/{tx['signature']}"
+                    msg = (
+                        f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
+                        f"[View on Solscan]({tx_link})"
+                    )
 
-                # Prepare the message
-                msg = f"🚀 {amount} tokens bought by `{buyer[:4]}...{buyer[-4:]}`"
+                    # Ensure we're using an async method correctly to send the message
+                    async def send_message():
+                        channel = await bot.fetch_channel(CHANNEL_ID)
+                        await channel.send(msg)
+                        print(f"✅ Sent message to channel {CHANNEL_ID}")
+                    
+                    # Ensure we're running this in the correct loop
+                    asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
 
-                # Send to Discord
-                send_discord_message(msg)
-
+        return {"status": "ok"}, 200
     except Exception as e:
-        print(f"Error getting transaction details: {e}")
-
-# Function to send a message to Discord
-async def send_discord_message(msg):
-    channel = await bot.fetch_channel(CHANNEL_ID)
-    await channel.send(msg)
-    print(f"✅ Sent message to channel {CHANNEL_ID}")
+        print(f"❌ Error processing webhook: {e}")
+        return {"status": "error", "message": str(e)}, 500
 
 # ====== BOT EVENTS ======
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
 
-# Poll the Solana blockchain every 60 seconds
-def poll_solana():
-    while True:
-        check_solana_transactions()
-        time.sleep(60)  # Sleep for 60 seconds before checking again
+    guild = discord.utils.get(bot.guilds, name="$MAYBACH420")  # Replace with actual guild name
+    if guild:
+        print(f"🔎 Found guild: {guild.name} (ID: {guild.id})", flush=True)
+        channel = discord.utils.get(guild.text_channels, name="new-buy")  # Replace with actual channel name
+        if channel:
+            print(f"💬 Found channel: {channel.name} (ID: {channel.id})", flush=True)
+        else:
+            print(f"⚠️ Channel not found", flush=True)
+    else:
+        print(f"⚠️ Guild not found", flush=True)
 
-# Start polling Solana in a separate thread
-import threading
-threading.Thread(target=poll_solana).start()
+# ====== FLASK IN THREAD ======
+def run_flask():
+    app.run(host="0.0.0.0", port=5000)
+
+# Start Flask in a separate thread to handle incoming webhooks
+threading.Thread(target=run_flask).start()
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
