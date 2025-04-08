@@ -1,5 +1,6 @@
-flask
-discord.py
-python-dotenv
-requests
-
+discord.py==2.0.0
+flask==2.0.2
+solana==0.21.0
+requests==2.25.1
+python-dotenv==0.19.1
+gunicorn==20.1.0
