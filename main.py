@@ -28,6 +28,7 @@ app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    print("Received a POST request at /webhook")  # Log to verify if the request is reaching the server
     data = request.get_json(force=True)
     print("📬 Webhook received:", data)  # Print all received data
 
