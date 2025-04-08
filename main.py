@@ -27,20 +27,12 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
-def webhook():
-    print("📬 Webhook received!")  # Initial logging to confirm webhook reception
+async def webhook():  # Mark this function as async
+    print("📬 Webhook received!")  # Add logging here to confirm receipt
 
-    # Check the request content type for debugging
-    print(f"Request Headers: {request.headers}")  # Log request headers
-    print(f"Request Content-Type: {request.content_type}")  # Log content type
-    
     try:
         data = request.get_json(force=True)
         print("📬 Webhook data:", data)  # Debug: Print the entire incoming data
-        
-        if not data:
-            print("❌ No data received in the webhook!")
-            return {"status": "error", "message": "No data received"}, 400
         
         # Add further debugging inside your transaction parsing loop
         for tx in data.get("transactions", []):
@@ -56,7 +48,7 @@ def webhook():
                         f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
                         f"[View on Solscan]({tx_link})"
                     )
-                    # Send the message asynchronously
+                    # Now we can safely use 'await' here since the function is async
                     channel = await bot.fetch_channel(CHANNEL_ID)
                     await channel.send(msg)
                     print(f"✅ Sent message to channel {CHANNEL_ID}")
@@ -64,6 +56,7 @@ def webhook():
     except Exception as e:
         print(f"❌ Error processing webhook: {e}")
         return {"status": "error", "message": str(e)}, 500
+
 
 # ====== BOT EVENTS ======
 @bot.event
@@ -84,12 +77,11 @@ async def on_ready():
 
 # ====== FLASK IN THREAD ======
 def run_flask():
-    print("🧑‍💻 Starting Flask server...")
     app.run(host="0.0.0.0", port=5000)
+
 
 # Start Flask in a separate thread to handle incoming webhooks
 threading.Thread(target=run_flask).start()
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
-
