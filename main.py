@@ -1,10 +1,11 @@
 import discord
 from discord.ext import commands
-from flask import Flask, request
+import requests
 import threading
 import asyncio
 import os
 from dotenv import load_dotenv
+from flask import Flask, request
 
 print("🚀 Starting bot...", flush=True)
 
@@ -91,6 +92,47 @@ def run_flask():
 
 # Start Flask in a separate thread to handle incoming webhooks
 threading.Thread(target=run_flask).start()
+
+# ====== FETCH TRANSACTION DATA FROM SOLSCAN ======
+def fetch_and_send_transactions():
+    # Define your Solscan token address
+    SOLSCAN_API_URL = f"https://api.solscan.io/account/txs?account={TOKEN_ADDRESS}&limit=10"
+
+    # Fetch transaction data
+    response = requests.get(SOLSCAN_API_URL)
+    transactions = response.json().get("data", [])
+
+    # Sample structure to hold formatted data
+    formatted_transactions = []
+
+    for tx in transactions:
+        # Checking if it's a token transfer transaction
+        for event in tx.get("events", {}).get("tokenTransfers", []):
+            if event.get("tokenAddress") == TOKEN_ADDRESS:
+                formatted_tx = {
+                    "signature": tx["signature"],
+                    "events": {
+                        "tokenTransfers": [
+                            {
+                                "tokenAddress": event["tokenAddress"],
+                                "fromUserAccount": event["fromUserAccount"],
+                                "amount": event["amount"],
+                                "decimals": event["decimals"]
+                            }
+                        ]
+                    }
+                }
+                formatted_transactions.append(formatted_tx)
+
+    # Now send the formatted transactions to the webhook
+    WEBHOOK_URL = "https://zjbl.onrender.com/webhook"
+    response = requests.post(WEBHOOK_URL, json={"transactions": formatted_transactions})
+
+    # Print the response for debugging
+    print(response.status_code, response.text)
+
+# Run the fetch and send transaction function (you can call this every X minutes or trigger it based on events)
+fetch_and_send_transactions()
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
