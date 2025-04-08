@@ -58,7 +58,7 @@ def webhook():
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
 
-    guild = discord.utils.get(bot.guilds, name="YOUR_GUILD_NAME")  # Replace with actual guild name
+    guild = discord.utils.get(bot.guilds, name="$MAYBACH420")  # Replace with actual guild name
     if guild:
         print(f"🔎 Found guild: {guild.name} (ID: {guild.id})", flush=True)
         channel = discord.utils.get(guild.text_channels, name="YOUR_CHANNEL_NAME")  # Replace with actual channel name
