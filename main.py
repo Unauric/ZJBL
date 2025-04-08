@@ -8,8 +8,6 @@ from dotenv import load_dotenv
 
 
 print("🚀 Starting bot...", flush=True)
-client = commands.Bot(command_prefix="!", intents=intents)
-
 
 load_dotenv()  # Load .env variables
 
@@ -25,6 +23,7 @@ intents.guilds = True
 intents.message_content = True  # Important for reading/sending messages
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+client = commands.Bot(command_prefix="!", intents=intents)
 
 # ====== FLASK SETUP ======
 app = Flask(__name__)
