@@ -4,8 +4,8 @@ from flask import Flask, request
 import threading
 import asyncio
 import os
-from dotenv import load_dotenv
 import requests
+from dotenv import load_dotenv
 
 print("🚀 Starting bot...", flush=True)
 
@@ -14,7 +14,7 @@ load_dotenv()  # Load .env variables
 # ====== CONFIGURATION ======
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS")
+TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS")  # Your token address for your coin
 
 # ====== DISCORD SETUP ======
 intents = discord.Intents.default()
@@ -35,7 +35,7 @@ def webhook():
         # Read incoming data
         data = request.get_json(force=True)
         print("📬 Webhook data:", data)  # Print out the incoming data for debugging
-        
+
         # Check if 'transactions' are present in the data
         if 'transactions' not in data:
             print("⚠️ No transactions found in the webhook data.")
@@ -44,23 +44,27 @@ def webhook():
         # Process the transactions
         for tx in data.get("transactions", []):
             print(f"Processing transaction: {tx}")  # Debug: print each transaction
+
+            # Loop through token transfers within the transaction
             for event in tx.get("events", {}).get("tokenTransfers", []):
                 print(f"Processing token transfer event: {event}")  # Debug: print each token transfer event
-                if event.get("tokenAddress") == TOKEN_ADDRESS:
+                if event.get("tokenAddress") == TOKEN_ADDRESS:  # Match with your coin's token address
                     print("✅ Found matching token address!")  # Token address matched
-                    
-                    # Fetch transaction details from Solscan
+
+                    # Extract transaction details
+                    buyer = event["fromUserAccount"]
+                    amount = int(event["amount"]) / (10 ** event["decimals"])  # Correct amount considering decimals
                     tx_signature = tx['signature']
+
+                    # Get transaction details from Solscan using the signature
                     solscan_url = f"https://api.solscan.io/transaction?tx={tx_signature}"
                     response = requests.get(solscan_url)
-                    
+
                     if response.status_code == 200:
                         tx_data = response.json()  # Transaction data from Solscan
-                        print(f"Transaction data: {tx_data}")
-                    
-                    # Proceed with the rest of your logic
-                    buyer = event["fromUserAccount"]
-                    amount = int(event["amount"]) / (10 ** event["decimals"])
+                        print(f"Transaction data from Solscan: {tx_data}")
+
+                    # Build message for Discord
                     tx_link = f"https://solscan.io/tx/{tx_signature}"
                     msg = (
                         f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
