@@ -74,9 +74,9 @@ async def check_new_transactions():
 # Start the polling task when the bot is ready
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-
-    # Start the polling task explicitly
+    print(f"✅ Bot logged in as {bot.user}. (ID: {bot.user.id})")
+    
+    # Ensure polling task starts only once and is triggered correctly
     try:
         if not check_new_transactions.is_running():
             print("🔄 Starting the polling task for transactions.")
@@ -87,4 +87,5 @@ async def on_ready():
         print(f"❌ Failed to start the polling task: {e}")
 
 # Run the bot
+print("🛠️ Running the bot...")
 bot.run(DISCORD_TOKEN)
