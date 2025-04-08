@@ -27,7 +27,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
-@app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json(force=True)
     print("📬 Webhook received:", data)  # Print all received data
@@ -46,15 +45,24 @@ def webhook():
                             f"🚀 {amount:.2f} $YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
                             f"[View on Solscan]({tx_link})"
                         )
-                        channel = await bot.fetch_channel(CHANNEL_ID)
-                        await channel.send(msg)
-                        print(f"✅ Sent message to channel {CHANNEL_ID}")
+
+                        # Debug: Print to check if the correct channel is fetched
+                        try:
+                            channel = await bot.fetch_channel(CHANNEL_ID)
+                            print(f"Fetched channel: {channel.name} (ID: {channel.id})")  # Debug: Check the fetched channel
+                            if not channel.permissions_for(bot.user).send_messages:
+                                print("❌ Bot does not have permission to send messages in this channel.")
+                            else:
+                                await channel.send(msg)
+                                print(f"✅ Sent message to channel {CHANNEL_ID}")
+                        except Exception as e:
+                            print(f"❌ Error fetching channel: {e}")
+
         except Exception as e:
             print(f"❌ Error processing webhook: {e}")
 
     asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
     return {"status": "ok"}, 200
-
 
 
 # ====== BOT EVENTS ======
@@ -79,5 +87,8 @@ def run_flask():
     app.run(host="0.0.0.0", port=5000)
 
 
+# Start Flask in a separate thread to handle incoming webhooks
 threading.Thread(target=run_flask).start()
+
+# Run the bot
 bot.run(DISCORD_TOKEN)
