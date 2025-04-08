@@ -1,11 +1,11 @@
 import discord
 from discord.ext import commands
-import requests
+from flask import Flask, request
 import threading
 import asyncio
 import os
 from dotenv import load_dotenv
-from flask import Flask, request
+import requests
 
 print("🚀 Starting bot...", flush=True)
 
@@ -86,24 +86,20 @@ async def on_ready():
     else:
         print(f"⚠️ Guild not found", flush=True)
 
-# ====== FLASK IN THREAD ======
-def run_flask():
-    app.run(host="0.0.0.0", port=5000)
-
-# Start Flask in a separate thread to handle incoming webhooks
-threading.Thread(target=run_flask).start()
-
-# ====== FETCH TRANSACTION DATA FROM SOLSCAN ======
-import requests
-
+# ====== FETCH AND SEND TRANSACTIONS ======
 def fetch_and_send_transactions():
     # Define your Solscan token address and endpoint
     SOLSCAN_API_URL = f"https://api.solscan.io/account/txs?account={TOKEN_ADDRESS}&limit=10"
 
+    # Headers to bypass Cloudflare or other protection mechanisms
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
     try:
-        # Fetch transaction data from Solscan
-        response = requests.get(SOLSCAN_API_URL)
-        
+        # Fetch transaction data from Solscan with headers
+        response = requests.get(SOLSCAN_API_URL, headers=headers)
+
         # Log the status code and the raw response content for debugging
         print(f"Solscan API Response Status Code: {response.status_code}")
         print(f"Solscan API Response Content: {response.text}")
@@ -151,12 +147,13 @@ def fetch_and_send_transactions():
     except Exception as e:
         print(f"❌ Error occurred while fetching or sending transactions: {e}")
 
+# ====== FLASK IN THREAD ======
+def run_flask():
+    app.run(host="0.0.0.0", port=5000)
 
-    # Print the response for debugging
-    print(response.status_code, response.text)
-
-# Run the fetch and send transaction function (you can call this every X minutes or trigger it based on events)
-fetch_and_send_transactions()
+# Start Flask in a separate thread to handle incoming webhooks
+threading.Thread(target=run_flask).start()
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
+
