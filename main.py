@@ -31,6 +31,9 @@ def webhook():
     print("📬 Webhook received!")  # Confirm receipt of webhook
 
     try:
+        # Debugging: print raw request data
+        print(f"📬 Raw Request Data: {request.data}")
+
         # Read incoming data
         data = request.get_json(force=True)
         print("📬 Webhook data:", data)  # Print out the incoming data for debugging
@@ -57,11 +60,17 @@ def webhook():
 
                     # Ensure we're using an async method correctly to send the message
                     async def send_message():
-                        channel = await bot.fetch_channel(CHANNEL_ID)
-                        await channel.send(msg)
-                        print(f"✅ Sent message to channel {CHANNEL_ID}")
+                        try:
+                            channel = await bot.fetch_channel(CHANNEL_ID)
+                            if channel:
+                                await channel.send(msg)
+                                print(f"✅ Sent message to channel {CHANNEL_ID}")
+                            else:
+                                print(f"⚠️ Could not find channel with ID {CHANNEL_ID}")
+                        except Exception as e:
+                            print(f"❌ Error sending message: {e}")
                     
-                    # Ensure we're running this in the correct loop
+                    # Run the coroutine safely within the bot's loop
                     asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
 
         return {"status": "ok"}, 200
@@ -74,23 +83,30 @@ def webhook():
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
 
-    guild = discord.utils.get(bot.guilds, name="$MAYBACH420")  # Replace with actual guild name
-    if guild:
-        print(f"🔎 Found guild: {guild.name} (ID: {guild.id})", flush=True)
-        channel = discord.utils.get(guild.text_channels, name="new-buy")  # Replace with actual channel name
-        if channel:
-            print(f"💬 Found channel: {channel.name} (ID: {channel.id})", flush=True)
+    try:
+        guild = discord.utils.get(bot.guilds, name="$MAYBACH420")  # Replace with actual guild name
+        if guild:
+            print(f"🔎 Found guild: {guild.name} (ID: {guild.id})", flush=True)
+            channel = discord.utils.get(guild.text_channels, name="new-buy")  # Replace with actual channel name
+            if channel:
+                print(f"💬 Found channel: {channel.name} (ID: {channel.id})", flush=True)
+            else:
+                print(f"⚠️ Channel not found", flush=True)
         else:
-            print(f"⚠️ Channel not found", flush=True)
-    else:
-        print(f"⚠️ Guild not found", flush=True)
+            print(f"⚠️ Guild not found", flush=True)
+    except Exception as e:
+        print(f"❌ Error in on_ready event: {e}", flush=True)
 
 # ====== FLASK IN THREAD ======
 def run_flask():
+    print("🌐 Starting Flask server...", flush=True)
     app.run(host="0.0.0.0", port=5000)
 
 # Start Flask in a separate thread to handle incoming webhooks
 threading.Thread(target=run_flask).start()
 
 # Run the bot
-bot.run(DISCORD_TOKEN)
+try:
+    bot.run(DISCORD_TOKEN)
+except Exception as e:
+    print(f"❌ Error running bot: {e}", flush=True)
