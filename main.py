@@ -4,7 +4,6 @@ import requests
 import asyncio
 import os
 from dotenv import load_dotenv
-import time
 
 # Load environment variables
 load_dotenv()
@@ -28,32 +27,35 @@ POLLING_INTERVAL = 60
 # ====== Polling Task to Check Transactions ======
 @tasks.loop(seconds=POLLING_INTERVAL)
 async def check_new_transactions():
-    print("🔄 Checking for new transactions...")
+    print("🔄 Checking for new transactions...")  # Log to verify the task is being executed
     try:
         # Make an API request to Solscan (or Solana RPC) to fetch transactions
         response = requests.get(SOLSCAN_API_URL, params={"token": TOKEN_ADDRESS, "limit": 10})
         
         if response.status_code == 200:
             transactions = response.json().get("data", [])
-            for tx in transactions:
-                signature = tx.get("signature")
-                token_transfers = tx.get("tokenTransfers", [])
+            if transactions:
+                for tx in transactions:
+                    signature = tx.get("signature")
+                    token_transfers = tx.get("tokenTransfers", [])
 
-                for transfer in token_transfers:
-                    if transfer.get("tokenAddress") == TOKEN_ADDRESS:
-                        # Process the token transfer event
-                        buyer = transfer.get("fromUserAccount")
-                        amount = int(transfer.get("amount")) / (10 ** transfer.get("decimals"))
-                        tx_link = f"https://solscan.io/tx/{signature}"
+                    for transfer in token_transfers:
+                        if transfer.get("tokenAddress") == TOKEN_ADDRESS:
+                            # Process the token transfer event
+                            buyer = transfer.get("fromUserAccount")
+                            amount = int(transfer.get("amount")) / (10 ** transfer.get("decimals"))
+                            tx_link = f"https://solscan.io/tx/{signature}"
 
-                        msg = (
-                            f"🚀 {amount:.2f} YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
-                            f"[View on Solscan]({tx_link})"
-                        )
-                        # Send the message to the Discord channel
-                        channel = await bot.fetch_channel(CHANNEL_ID)
-                        await channel.send(msg)
-                        print(f"✅ Sent message for transaction {signature}")
+                            msg = (
+                                f"🚀 {amount:.2f} YOURCOIN bought by `{buyer[:4]}...{buyer[-4:]}`\n"
+                                f"[View on Solscan]({tx_link})"
+                            )
+                            # Send the message to the Discord channel
+                            channel = await bot.fetch_channel(CHANNEL_ID)
+                            await channel.send(msg)
+                            print(f"✅ Sent message for transaction {signature}")
+            else:
+                print("🔄 No new transactions found.")
         else:
             print(f"❌ Failed to fetch transactions: {response.status_code}")
     
@@ -64,7 +66,7 @@ async def check_new_transactions():
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-    check_new_transactions.start()
+    check_new_transactions.start()  # Ensure the polling task starts when the bot is ready
 
 # Run the bot
 bot.run(DISCORD_TOKEN)
