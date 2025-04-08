@@ -27,15 +27,18 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json(force=True)
-    print("📬 Webhook received:", data)
+    print("📬 Webhook received:", data)  # Print all received data
 
     async def send_message():
         try:
             for tx in data.get("transactions", []):
+                print(f"Processing transaction: {tx}")  # Debug: print transaction
                 for event in tx.get("events", {}).get("tokenTransfers", []):
-                    if event["tokenAddress"] == TOKEN_ADDRESS:
+                    print(f"Processing token transfer event: {event}")  # Debug: print token transfer
+                    if event.get("tokenAddress") == TOKEN_ADDRESS:
                         buyer = event["fromUserAccount"]
                         amount = int(event["amount"]) / (10 ** event["decimals"])
                         tx_link = f"https://solscan.io/tx/{tx['signature']}"
@@ -51,6 +54,7 @@ def webhook():
 
     asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
     return {"status": "ok"}, 200
+
 
 
 # ====== BOT EVENTS ======
