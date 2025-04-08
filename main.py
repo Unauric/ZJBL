@@ -94,39 +94,63 @@ def run_flask():
 threading.Thread(target=run_flask).start()
 
 # ====== FETCH TRANSACTION DATA FROM SOLSCAN ======
+import requests
+
 def fetch_and_send_transactions():
-    # Define your Solscan token address
+    # Define your Solscan token address and endpoint
     SOLSCAN_API_URL = f"https://api.solscan.io/account/txs?account={TOKEN_ADDRESS}&limit=10"
 
-    # Fetch transaction data
-    response = requests.get(SOLSCAN_API_URL)
-    transactions = response.json().get("data", [])
+    try:
+        # Fetch transaction data from Solscan
+        response = requests.get(SOLSCAN_API_URL)
+        
+        # Log the status code and the raw response content for debugging
+        print(f"Solscan API Response Status Code: {response.status_code}")
+        print(f"Solscan API Response Content: {response.text}")
+        
+        # If the request was successful, try to parse the JSON response
+        if response.status_code == 200:
+            transactions = response.json().get("data", [])
+        else:
+            print(f"❌ Error: Solscan API returned an error with status code {response.status_code}")
+            return
+        
+        # Sample structure to hold formatted data
+        formatted_transactions = []
 
-    # Sample structure to hold formatted data
-    formatted_transactions = []
-
-    for tx in transactions:
-        # Checking if it's a token transfer transaction
-        for event in tx.get("events", {}).get("tokenTransfers", []):
-            if event.get("tokenAddress") == TOKEN_ADDRESS:
-                formatted_tx = {
-                    "signature": tx["signature"],
-                    "events": {
-                        "tokenTransfers": [
-                            {
-                                "tokenAddress": event["tokenAddress"],
-                                "fromUserAccount": event["fromUserAccount"],
-                                "amount": event["amount"],
-                                "decimals": event["decimals"]
-                            }
-                        ]
+        for tx in transactions:
+            # Checking if it's a token transfer transaction
+            for event in tx.get("events", {}).get("tokenTransfers", []):
+                if event.get("tokenAddress") == TOKEN_ADDRESS:
+                    formatted_tx = {
+                        "signature": tx["signature"],
+                        "events": {
+                            "tokenTransfers": [
+                                {
+                                    "tokenAddress": event["tokenAddress"],
+                                    "fromUserAccount": event["fromUserAccount"],
+                                    "amount": event["amount"],
+                                    "decimals": event["decimals"]
+                                }
+                            ]
+                        }
                     }
-                }
-                formatted_transactions.append(formatted_tx)
+                    formatted_transactions.append(formatted_tx)
 
-    # Now send the formatted transactions to the webhook
-    WEBHOOK_URL = "https://zjbl.onrender.com/webhook"
-    response = requests.post(WEBHOOK_URL, json={"transactions": formatted_transactions})
+        # Now send the formatted transactions to the webhook
+        if formatted_transactions:
+            WEBHOOK_URL = "https://zjbl.onrender.com/webhook"
+            response = requests.post(WEBHOOK_URL, json={"transactions": formatted_transactions})
+
+            # Print the response for debugging
+            print(f"Webhook Response Status Code: {response.status_code}")
+            print(f"Webhook Response Text: {response.text}")
+        else:
+            print("⚠️ No matching transactions found to send to webhook.")
+
+    except Exception as e:
+        print(f"❌ Error occurred while fetching or sending transactions: {e}")
+
 
     # Print the response for debugging
     print(response.status_code, response.text)
