@@ -89,13 +89,15 @@ async def check_moralis_transactions():
         buyer = latest_tx.get("buyer", "Unknown")
         amount = latest_tx.get("amount", "0")
         price = latest_tx.get("price", "0")
-        tx_link = f"https://solscan.io/tx/{sig}"  # Moralis doesn't provide a link, so fallback to Solscan
+        token_name = latest_tx.get("bought", {}).get("name", "Unknown")
+        usd_amount = latest_tx.get("bought", {}).get("usdAmount", "0")
 
         msg = (
             f"🚀 **New Buy on Solana Token!**\n"
             f"👤 Buyer: `{buyer[:4]}...{buyer[-4:]}`\n"
-            f"💸 Amount: {amount} SOL at {price} SOL/token\n"
-            f"[🔗 View on Solscan]({tx_link})"
+            f"💰 Token: {token_name}\n"
+            f"💸 Amount: {amount} {token_name} at {price} SOL/token\n"
+            f"💵 Total Value: ${usd_amount}\n"
         )
 
         print(f"📢 Sending message to Discord: {msg}", flush=True)
