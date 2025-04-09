@@ -47,7 +47,7 @@ def get_transactions():
 
         transactions = []
         for tx in data['result']:
-            # Check if the transaction is a buy
+            # Only process buy transactions
             if tx.get("transactionType") == "buy":
                 signature = tx.get("transactionHash", "N/A")
                 wallet_address = tx.get("walletAddress", "Unknown")
@@ -91,27 +91,24 @@ async def check_moralis_transactions():
         wallet_address = latest_tx.get("wallet_address", "Unknown")
         token_name = latest_tx.get("token_name", "Unknown")
         usd_amount = latest_tx.get("usd_amount", "0")
-        buyOrSell = latest_tx.get("transactionType", "Unknown")
 
-        
-        # Construct the message
-        if(buyOrSell == "buy"):
-          msg = (
+        # Construct the message for buy transactions only
+        msg = (
             f"🚀 **New Buy on Solana Token!**\n"
             f"👤 Buyer: [View Wallet](https://solscan.io/address/{wallet_address})\n"
             f"💰 Token: {token_name}\n"
             f"💵 Total Value: ${usd_amount}\n"
-          )
+        )
 
         print(f"📢 Sending message to Discord: {msg}", flush=True)
 
+        # Send the message to the specified Discord channel
         channel = await bot.fetch_channel(CHANNEL_ID)
         await channel.send(msg)
         print(f"✅ Sent Moralis alert for tx {sig}", flush=True)
 
     except Exception as e:
         print(f"❌ Error in check_moralis_transactions: {e}", flush=True)
-
 
 
 @bot.event
