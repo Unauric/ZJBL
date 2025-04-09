@@ -48,15 +48,15 @@ def get_transactions():
         transactions = []
         for tx in data['result']:
             signature = tx.get("transactionHash", "N/A")
-            buyer = tx.get("bought", {}).get("name", "Unknown")
-            amount = tx.get("bought", {}).get("value", "0")
-            price = tx.get("price", "0")
+            wallet_address = tx.get("walletAddress", "Unknown")
+            token_name = tx.get("bought", {}).get("name", "Unknown")
+            usd_amount = tx.get("bought", {}).get("usdAmount", "0")
 
             transactions.append({
                 'signature': signature,
-                'buyer': buyer,
-                'amount': amount,
-                'price': price
+                'wallet_address': wallet_address,
+                'token_name': token_name,
+                'usd_amount': usd_amount
             })
 
         return transactions
@@ -86,17 +86,15 @@ async def check_moralis_transactions():
         # New transaction detected
         last_seen_signature = sig
 
-        buyer = latest_tx.get("buyer", "Unknown")
-        amount = latest_tx.get("amount", "0")
-        price = latest_tx.get("price", "0")
-        token_name = latest_tx.get("bought", {}).get("name", "Unknown")
-        usd_amount = latest_tx.get("bought", {}).get("usdAmount", "0")
+        wallet_address = latest_tx.get("wallet_address", "Unknown")
+        token_name = latest_tx.get("token_name", "Unknown")
+        usd_amount = latest_tx.get("usd_amount", "0")
 
+        # Construct the message
         msg = (
             f"🚀 **New Buy on Solana Token!**\n"
-            f"👤 Buyer: `{buyer[:4]}...{buyer[-4:]}`\n"
+            f"👤 Buyer: [View Wallet](https://solscan.io/address/{wallet_address})\n"
             f"💰 Token: {token_name}\n"
-            f"💸 Amount: {amount} {token_name} at {price} SOL/token\n"
             f"💵 Total Value: ${usd_amount}\n"
         )
 
@@ -108,6 +106,7 @@ async def check_moralis_transactions():
 
     except Exception as e:
         print(f"❌ Error in check_moralis_transactions: {e}", flush=True)
+
 
 @bot.event
 async def on_ready():
