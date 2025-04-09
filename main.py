@@ -1,11 +1,10 @@
 import discord
 from discord.ext import commands, tasks
-import asyncio
-import aiohttp
+import requests
+from bs4 import BeautifulSoup
 import os
 from dotenv import load_dotenv
-
-print("🚀 Starting bot...", flush=True)
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -22,75 +21,76 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Solscan API URL
-SOLSCAN_API_URL = f"https://api.solscan.io/v1/transaction?address={TOKEN_ADDRESS}"
+# Solscan URL for your token
+solscan_url = f"https://solscan.io/token/{TOKEN_ADDRESS}"
 
-# Track last seen signature
+# Track last seen transaction signature to avoid sending duplicate messages
 last_seen_signature = None
 
-# Solscan API polling setup
-@tasks.loop(seconds=10)
-async def check_solscan_transactions():
+# Scrape transaction data from Solscan
+def scrape_solscan():
     global last_seen_signature
     try:
-        print(f"📡 Fetching data from Solscan: {SOLSCAN_API_URL}", flush=True)
+        # Send GET request to Solscan token page
+        response = requests.get(solscan_url)
+        
+        # If the request is successful
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, "html.parser")
+            
+            # Find all transaction rows (update the class selector as per actual Solscan structure)
+            transactions = soup.find_all("div", class_="transaction-row")  # Example, adjust as needed
+            
+            for tx in transactions:
+                tx_hash = tx.find("a", class_="txHash").get("href")
+                buyer = tx.find("div", class_="buyer").get_text()
+                amount = tx.find("div", class_="amount").get_text()
+                signature = tx_hash.split('/')[-1]  # Assuming the tx hash is part of the URL
+                
+                # If this is a new transaction
+                if signature != last_seen_signature:
+                    # Update the last seen signature
+                    last_seen_signature = signature
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(SOLSCAN_API_URL) as resp:
-                print(f"🌐 Solscan API status code: {resp.status}", flush=True)
-                if resp.status != 200:
-                    print(f"❌ Failed to fetch data from Solscan", flush=True)
-                    return
+                    # Construct the message to send to Discord
+                    msg = (
+                        f"🚀 **New Buy on Solscan!**\n"
+                        f"👤 Buyer: `{buyer[:4]}...{buyer[-4:]}`\n"
+                        f"💸 Amount: {amount}\n"
+                        f"[🔗 View Transaction]({tx_hash})"
+                    )
 
-                data = await resp.json()
-                print(f"📊 Solscan API data: {data}", flush=True)
+                    # Send the message to Discord
+                    asyncio.run(send_message(msg))
 
-                if not data or not isinstance(data, list):
-                    print("⚠️ No valid data returned from Solscan", flush=True)
-                    return
-
-                latest_tx = data[0]  # Most recent transaction
-                sig = latest_tx.get("signature")
-
-                if sig == last_seen_signature:
-                    print("⏳ No new transaction since last check.", flush=True)
-                    return  # No new transaction
-
-                # New transaction detected
-                last_seen_signature = sig
-
-                buyer = latest_tx.get("buyer", "Unknown")
-                amount = latest_tx.get("amount", 0)
-                price = latest_tx.get("price", 0)
-                market_cap = latest_tx.get("marketCap", 0)
-                tx_link = f"https://solscan.io/tx/{sig}"
-
-                msg = (
-                    f"🚀 **New Buy on Solscan!**\n"
-                    f"👤 Buyer: `{buyer[:4]}...{buyer[-4:]}`\n"
-                    f"💸 Amount: {amount:.4f} SOL at {price:.4f} SOL/token\n"
-                    f"📈 Market Cap: {market_cap} SOL\n"
-                    f"[🔗 View on Solscan]({tx_link})"
-                )
-
-                print(f"📢 Sending message to Discord: {msg}", flush=True)
-
-                # Send message to Discord channel
-                channel = await bot.fetch_channel(CHANNEL_ID)
-                await channel.send(msg)
-                print(f"✅ Sent Solscan alert for tx {sig}", flush=True)
+        else:
+            print(f"❌ Failed to retrieve the Solscan page. Status code: {response.status_code}")
 
     except Exception as e:
-        print(f"❌ Error in check_solscan_transactions: {e}", flush=True)
+        print(f"❌ Error in scraping Solscan: {e}")
 
-# Bot event to start the transaction check loop
+
+# Send the message to the Discord channel
+async def send_message(msg):
+    try:
+        channel = await bot.fetch_channel(CHANNEL_ID)
+        await channel.send(msg)
+        print(f"✅ Sent transaction alert: {msg}")
+    except Exception as e:
+        print(f"❌ Error sending message to Discord: {e}")
+
+
+# Periodically check for new transactions every 60 seconds
+@tasks.loop(seconds=60)
+async def check_transactions():
+    print("📡 Checking for new transactions...")
+    scrape_solscan()
+
+
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
-    check_solscan_transactions.start()
-    for guild in bot.guilds:
-        print(f"📌 Connected to guild: {guild.name} (ID: {guild.id})", flush=True)
-        for channel in guild.text_channels:
-            print(f"   └─ 💬 {channel.name} (ID: {channel.id})", flush=True)
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    check_transactions.start()
+
 
 bot.run(DISCORD_TOKEN)
