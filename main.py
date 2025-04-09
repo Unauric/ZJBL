@@ -27,9 +27,6 @@ last_seen_signature = None
 PUMP_API_URL = f"https://pump.fun/api/trades/{TOKEN_ADDRESS}"
 
 @tasks.loop(seconds=10)
-from discord.ext import tasks
-import aiohttp
-
 async def check_pumpfun_transactions():
     global last_seen_signature
     try:
