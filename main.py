@@ -13,7 +13,6 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS")
-BIRDEYE_API_KEY = "b1471121fcad4a5d98f5d9b44668e372"  # Add this to your .env
 
 # Discord bot setup
 intents = discord.Intents.default()
@@ -27,15 +26,13 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 last_seen_signature = None
 
 def get_latest_buy():
-    url = f"https://public-api.birdeye.so/public/transaction/token/{TOKEN_ADDRESS}?type=buy&limit=1"
-    headers = {
-        "X-API-KEY": BIRDEYE_API_KEY
-    }
-
+    # Use Solscan API to fetch the latest buy transaction for your token
+    url = f"https://api.solscan.io/v1/account/tokens/{TOKEN_ADDRESS}?type=buy&limit=1"
+    
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url)
         if response.status_code != 200:
-            print(f"❌ Birdeye API error: {response.status_code}")
+            print(f"❌ Solscan API error: {response.status_code}")
             return None
         
         data = response.json()
@@ -45,21 +42,21 @@ def get_latest_buy():
         
         return txs[0]  # latest buy tx
     except Exception as e:
-        print(f"❌ Exception while fetching from Birdeye: {e}")
+        print(f"❌ Exception while fetching from Solscan: {e}")
         return None
 
 @tasks.loop(seconds=30)
 async def check_birdeye_transactions():
     global last_seen_signature
 
-    print("📡 Checking Birdeye for new buys...", flush=True)
+    print("📡 Checking Solscan for new buys...", flush=True)
     latest_tx = get_latest_buy()
 
     if not latest_tx:
         print("⚠️ No recent buy transactions found.")
         return
 
-    sig = latest_tx["txHash"]
+    sig = latest_tx["signature"]
     if sig == last_seen_signature:
         print("⏳ No new buys.")
         return
@@ -72,7 +69,7 @@ async def check_birdeye_transactions():
     tx_link = f"https://solscan.io/tx/{sig}"
 
     msg = (
-        f"🚀 **New Buy on Birdeye!**\n"
+        f"🚀 **New Buy on Solscan!**\n"
         f"👤 Buyer: `{buyer[:4]}...{buyer[-4:]}`\n"
         f"💰 Amount: {amount:.4f} SOL (~${usd_value:.2f})\n"
         f"[🔗 View on Solscan]({tx_link})"
