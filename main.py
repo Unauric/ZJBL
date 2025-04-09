@@ -27,26 +27,36 @@ last_seen_signature = None
 PUMP_API_URL = f"https://pump.fun/api/trades/{TOKEN_ADDRESS}"
 
 @tasks.loop(seconds=10)
+from discord.ext import tasks
+import aiohttp
+
 async def check_pumpfun_transactions():
     global last_seen_signature
     try:
+        print(f"📡 Fetching data from Pump.fun: {PUMP_API_URL}", flush=True)
+
         async with aiohttp.ClientSession() as session:
             async with session.get(PUMP_API_URL) as resp:
+                print(f"🌐 Pump.fun API status code: {resp.status}", flush=True)
                 if resp.status != 200:
-                    print(f"❌ API error: {resp.status}")
+                    print(f"❌ Failed to fetch data from Pump.fun", flush=True)
                     return
 
                 data = await resp.json()
-                if not data:
-                    print("⚠️ No data returned from Pump.fun")
+                print(f"📊 Pump.fun API data: {data}", flush=True)
+
+                if not data or not isinstance(data, list):
+                    print("⚠️ No valid data returned from Pump.fun", flush=True)
                     return
 
-                latest_tx = data[0]
+                latest_tx = data[0]  # Most recent transaction
                 sig = latest_tx.get("signature")
 
                 if sig == last_seen_signature:
-                    return
+                    print("⏳ No new transaction since last check.", flush=True)
+                    return  # No new transaction
 
+                # New transaction detected
                 last_seen_signature = sig
 
                 buyer = latest_tx.get("buyer", "Unknown")
@@ -63,12 +73,15 @@ async def check_pumpfun_transactions():
                     f"[🔗 View on Solscan]({tx_link})"
                 )
 
+                print(f"📢 Sending message to Discord: {msg}", flush=True)
+
                 channel = await bot.fetch_channel(CHANNEL_ID)
                 await channel.send(msg)
-                print(f"✅ Sent Pump.fun alert: {sig}")
+                print(f"✅ Sent Pump.fun alert for tx {sig}", flush=True)
 
     except Exception as e:
-        print(f"❌ Error in check_pumpfun_transactions: {e}")
+        print(f"❌ Error in check_pumpfun_transactions: {e}", flush=True)
+
 
 @bot.event
 async def on_ready():
