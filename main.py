@@ -1,10 +1,12 @@
 import discord
 from discord.ext import commands, tasks
+import asyncio
 import requests
 from bs4 import BeautifulSoup
 import os
 from dotenv import load_dotenv
-import asyncio
+
+print("🚀 Starting bot...", flush=True)
 
 # Load environment variables
 load_dotenv()
@@ -21,76 +23,93 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Solscan URL for your token
-solscan_url = f"https://solscan.io/token/{TOKEN_ADDRESS}"
-
-# Track last seen transaction signature to avoid sending duplicate messages
+# Solscan scraping setup
 last_seen_signature = None
+SOLSCAN_URL = f"https://solscan.io/token/{TOKEN_ADDRESS}"
 
-# Scrape transaction data from Solscan
-def scrape_solscan():
-    global last_seen_signature
+def get_transactions():
+    """Scrapes the Solscan page for transactions and returns the latest transaction data."""
     try:
-        # Send GET request to Solscan token page
-        response = requests.get(solscan_url)
+        response = requests.get(SOLSCAN_URL)
+        if response.status_code != 200:
+            print(f"❌ Failed to fetch data from Solscan. Status code: {response.status_code}")
+            return []
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Find transaction data in the page
+        transactions = []
+        rows = soup.find_all('tr', class_='table-row')  # Find rows with transaction data
+        for row in rows:
+            signature = row.find('td', class_='text-left').text.strip()
+            buyer = row.find_all('td', class_='text-center')[1].text.strip()  # Adjust this index based on the actual layout
+            amount = row.find_all('td', class_='text-right')[1].text.strip()  # Adjust this index based on the actual layout
+            price = row.find_all('td', class_='text-right')[2].text.strip()  # Adjust this index based on the actual layout
+
+            transactions.append({
+                'signature': signature,
+                'buyer': buyer,
+                'amount': amount,
+                'price': price
+            })
         
-        # If the request is successful
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, "html.parser")
-            
-            # Find all transaction rows (update the class selector as per actual Solscan structure)
-            transactions = soup.find_all("div", class_="transaction-row")  # Example, adjust as needed
-            
-            for tx in transactions:
-                tx_hash = tx.find("a", class_="txHash").get("href")
-                buyer = tx.find("div", class_="buyer").get_text()
-                amount = tx.find("div", class_="amount").get_text()
-                signature = tx_hash.split('/')[-1]  # Assuming the tx hash is part of the URL
-                
-                # If this is a new transaction
-                if signature != last_seen_signature:
-                    # Update the last seen signature
-                    last_seen_signature = signature
-
-                    # Construct the message to send to Discord
-                    msg = (
-                        f"🚀 **New Buy on Solscan!**\n"
-                        f"👤 Buyer: `{buyer[:4]}...{buyer[-4:]}`\n"
-                        f"💸 Amount: {amount}\n"
-                        f"[🔗 View Transaction]({tx_hash})"
-                    )
-
-                    # Send the message to Discord
-                    asyncio.run(send_message(msg))
-
-        else:
-            print(f"❌ Failed to retrieve the Solscan page. Status code: {response.status_code}")
-
+        return transactions
     except Exception as e:
-        print(f"❌ Error in scraping Solscan: {e}")
+        print(f"❌ Error fetching or parsing Solscan data: {e}")
+        return []
 
 
-# Send the message to the Discord channel
-async def send_message(msg):
+@tasks.loop(seconds=60)  # Check every 60 seconds
+async def check_solscan_transactions():
+    global last_seen_signature
+
     try:
+        print(f"📡 Fetching data from Solscan: {SOLSCAN_URL}", flush=True)
+        transactions = get_transactions()
+
+        if not transactions:
+            print("⚠️ No transactions found or failed to fetch data.", flush=True)
+            return
+
+        latest_tx = transactions[0]  # Most recent transaction
+        sig = latest_tx['signature']
+
+        if sig == last_seen_signature:
+            print("⏳ No new transaction since last check.", flush=True)
+            return  # No new transaction
+
+        # New transaction detected
+        last_seen_signature = sig
+
+        buyer = latest_tx.get("buyer", "Unknown")
+        amount = latest_tx.get("amount", "0")
+        price = latest_tx.get("price", "0")
+        tx_link = f"https://solscan.io/tx/{sig}"
+
+        msg = (
+            f"🚀 **New Buy on Solscan!**\n"
+            f"👤 Buyer: `{buyer[:4]}...{buyer[-4:]}`\n"
+            f"💸 Amount: {amount} SOL at {price} SOL/token\n"
+            f"[🔗 View on Solscan]({tx_link})"
+        )
+
+        print(f"📢 Sending message to Discord: {msg}", flush=True)
+
         channel = await bot.fetch_channel(CHANNEL_ID)
         await channel.send(msg)
-        print(f"✅ Sent transaction alert: {msg}")
+        print(f"✅ Sent Solscan alert for tx {sig}", flush=True)
+
     except Exception as e:
-        print(f"❌ Error sending message to Discord: {e}")
-
-
-# Periodically check for new transactions every 60 seconds
-@tasks.loop(seconds=60)
-async def check_transactions():
-    print("📡 Checking for new transactions...")
-    scrape_solscan()
+        print(f"❌ Error in check_solscan_transactions: {e}", flush=True)
 
 
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-    check_transactions.start()
-
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
+    check_solscan_transactions.start()
+    for guild in bot.guilds:
+        print(f"📌 Connected to guild: {guild.name} (ID: {guild.id})", flush=True)
+        for channel in guild.text_channels:
+            print(f"   └─ 💬 {channel.name} (ID: {channel.id})", flush=True)
 
 bot.run(DISCORD_TOKEN)
