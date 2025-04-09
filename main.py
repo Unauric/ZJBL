@@ -26,7 +26,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 API_URL = f"https://solana-gateway.moralis.io/token/mainnet/{TOKEN_ADDRESS}/swaps?order=DESC"
 API_HEADERS = {
     "Accept": "application/json",
-    "X-API-Key": os.getenv("MORALIS_API_KEY")  # Ensure to set this in your .env file
+    "X-API-Key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjExYjQ4YjQ4LWJhYjgtNDJkOC1iNzEyLTVhZWYwZWY0NGU1NiIsIm9yZ0lkIjoiNDQwODEwIiwidXNlcklkIjoiNDUzNTExIiwidHlwZUlkIjoiZTRmNzJlNWEtNmU5MS00NjRmLTg2NDktMDhiMzg5NzI0MTBhIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDQyMjQ3NzYsImV4cCI6NDg5OTk4NDc3Nn0.--O9_2uuC7l5xyg7CJ8Jktr0fuGbWfH8olLfbeKkqmI"
 }
 
 # Store the last seen transaction hash to prevent duplicate alerts
