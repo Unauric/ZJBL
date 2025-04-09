@@ -47,17 +47,19 @@ def get_transactions():
 
         transactions = []
         for tx in data['result']:
-            signature = tx.get("transactionHash", "N/A")
-            wallet_address = tx.get("walletAddress", "Unknown")
-            token_name = tx.get("bought", {}).get("name", "Unknown")
-            usd_amount = tx.get("bought", {}).get("usdAmount", "0")
+            # Check if the transaction is a buy
+            if tx.get("transactionType") == "buy":
+                signature = tx.get("transactionHash", "N/A")
+                wallet_address = tx.get("walletAddress", "Unknown")
+                token_name = tx.get("bought", {}).get("name", "Unknown")
+                usd_amount = tx.get("bought", {}).get("usdAmount", "0")
 
-            transactions.append({
-                'signature': signature,
-                'wallet_address': wallet_address,
-                'token_name': token_name,
-                'usd_amount': usd_amount
-            })
+                transactions.append({
+                    'signature': signature,
+                    'wallet_address': wallet_address,
+                    'token_name': token_name,
+                    'usd_amount': usd_amount
+                })
 
         return transactions
     except Exception as e:
@@ -73,17 +75,17 @@ async def check_moralis_transactions():
         transactions = get_transactions()
 
         if not transactions:
-            print("⚠️ No transactions found or failed to fetch data.", flush=True)
+            print("⚠️ No buy transactions found or failed to fetch data.", flush=True)
             return
 
-        latest_tx = transactions[0]  # Most recent transaction
+        latest_tx = transactions[0]  # Most recent buy transaction
         sig = latest_tx['signature']
 
         if sig == last_seen_signature:
-            print("⏳ No new transaction since last check.", flush=True)
+            print("⏳ No new buy transaction since last check.", flush=True)
             return  # No new transaction
 
-        # New transaction detected
+        # New buy transaction detected
         last_seen_signature = sig
 
         wallet_address = latest_tx.get("wallet_address", "Unknown")
@@ -106,6 +108,7 @@ async def check_moralis_transactions():
 
     except Exception as e:
         print(f"❌ Error in check_moralis_transactions: {e}", flush=True)
+
 
 
 @bot.event
