@@ -29,7 +29,7 @@ API_HEADERS = {
     "X-API-Key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjExYjQ4YjQ4LWJhYjgtNDJkOC1iNzEyLTVhZWYwZWY0NGU1NiIsIm9yZ0lkIjoiNDQwODEwIiwidXNlcklkIjoiNDUzNTExIiwidHlwZUlkIjoiZTRmNzJlNWEtNmU5MS00NjRmLTg2NDktMDhiMzg5NzI0MTBhIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDQyMjQ3NzYsImV4cCI6NDg5OTk4NDc3Nn0.--O9_2uuC7l5xyg7CJ8Jktr0fuGbWfH8olLfbeKkqmI"
 }
 
-# Store the last seen transaction hash to prevent duplicate alerts
+# Store the last seen transaction hash
 last_seen_signature = None
 
 def get_transactions():
@@ -47,7 +47,6 @@ def get_transactions():
 
         transactions = []
         for tx in data['result']:
-            # Only process buy transactions
             if tx.get("transactionType") == "buy":
                 signature = tx.get("transactionHash", "N/A")
                 wallet_address = tx.get("walletAddress", "Unknown")
@@ -66,7 +65,7 @@ def get_transactions():
         print(f"❌ Error fetching or parsing Moralis API data: {e}")
         return []
 
-@tasks.loop(seconds=120)  # Check every 60 seconds
+@tasks.loop(seconds=120)
 async def check_moralis_transactions():
     global last_seen_signature
 
@@ -78,38 +77,42 @@ async def check_moralis_transactions():
             print("⚠️ No buy transactions found or failed to fetch data.", flush=True)
             return
 
-        latest_tx = transactions[0]  # Most recent buy transaction
+        latest_tx = transactions[0]
         sig = latest_tx['signature']
 
         if sig == last_seen_signature:
             print("⏳ No new buy transaction since last check.", flush=True)
-            return  # No new transaction
+            return
 
-        # New buy transaction detected
         last_seen_signature = sig
 
         wallet_address = latest_tx.get("wallet_address", "Unknown")
         token_name = latest_tx.get("token_name", "Unknown")
         usd_amount = latest_tx.get("usd_amount", "0")
 
-        # Construct the message for buy transactions only
-        msg = (
-            f"🚀 **NEW BUY!**\n"
-            f"👤 Buyer: [View Wallet](https://solscan.io/address/{wallet_address})\n"
-            f"💰 Token: {token_name}\n"
-            f"💵 Total Value: ${usd_amount}\n"
+        # Create embed
+        embed = discord.Embed(
+            title="🟢 NEW BUY ALERT!",
+            description=(
+                f"👤 **Buyer:** [View Wallet](https://solscan.io/address/{wallet_address})\n"
+                f"🪙 **Token:** `{token_name}`\n"
+                f"💵 **Total Value:** `${usd_amount}`"
+            ),
+            color=discord.Color.green()
         )
 
-        print(f"📢 Sending message to Discord: {msg}", flush=True)
+        # Set image (replace with a reliable image link)
+        embed.set_image(url="https://scontent.fvno1-1.fna.fbcdn.net/v/t39.30808-6/273730832_107107331960627_7929249299672926618_n.jpg")
 
-        # Send the message to the specified Discord channel
+        print(f"📢 Sending embed to Discord...", flush=True)
+
         channel = await bot.fetch_channel(CHANNEL_ID)
-        await channel.send(msg)
+        await channel.send(embed=embed)
+
         print(f"✅ Sent Moralis alert for tx {sig}", flush=True)
 
     except Exception as e:
         print(f"❌ Error in check_moralis_transactions: {e}", flush=True)
-
 
 @bot.event
 async def on_ready():
