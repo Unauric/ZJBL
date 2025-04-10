@@ -116,19 +116,6 @@ async def check_moralis_transactions():
     except Exception as e:
         print(f"❌ Error in check_moralis_transactions: {e}", flush=True)
 
-@bot.event
-async def on_ready():
-    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
-    check_moralis_transactions.start()
-    check_tiktok_upload.start()
-    for guild in bot.guilds:
-        print(f"📌 Connected to guild: {guild.name} (ID: {guild.id})", flush=True)
-        for channel in guild.text_channels:
-            print(f"   └─ 💬 {channel.name} (ID: {channel.id})", flush=True)
-
-bot.run(DISCORD_TOKEN)
-
-
 # TikTok API setup
 TIKTOK_API_HOST = "tiktok-api23.p.rapidapi.com"
 TIKTOK_API_KEY = "69ecd569acmsh0109968293cfa28p19897ajsn7c400e914f77"
@@ -193,5 +180,20 @@ async def check_tiktok_upload():
 
                             await channel.send(embed=embed)
                             return
+
+
+
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
+    check_moralis_transactions.start()
+    check_tiktok_upload.start()
+    for guild in bot.guilds:
+        print(f"📌 Connected to guild: {guild.name} (ID: {guild.id})", flush=True)
+        for channel in guild.text_channels:
+            print(f"   └─ 💬 {channel.name} (ID: {channel.id})", flush=True)
+
+bot.run(DISCORD_TOKEN)
+
 
 
