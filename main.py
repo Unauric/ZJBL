@@ -129,14 +129,12 @@ headers = {
 last_video_id = None
 
 def fetch_latest_tiktok():
-    conn = http.client.HTTPSConnection(TIKTOK_API_HOST)
-    conn.request("GET", f"/api/user/posts?secUid={TIKTOK_SECUID}&count=1&cursor=0", headers=headers)
-    res = conn.getresponse()
-    data = res.read().decode("utf-8")
-
+    url = f"https://{TIKTOK_API_HOST}/api/user/posts?secUid={TIKTOK_SECUID}&count=1&cursor=0"
     try:
-        import json
-        parsed = json.loads(data)
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        parsed = response.json()
+
         videos = parsed.get("data", {}).get("videos", [])
         if not videos:
             return None
@@ -149,8 +147,9 @@ def fetch_latest_tiktok():
             "video_url": f"https://www.tiktok.com/@maybachidze__/video/{latest.get('id')}"
         }
     except Exception as e:
-        print(f"❌ Failed to parse TikTok API response: {e}")
+        print(f"❌ Failed to fetch or parse TikTok API response: {e}")
         return None
+
 
 @tasks.loop(minutes=10)
 async def check_tiktok_upload():
