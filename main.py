@@ -66,7 +66,7 @@ def get_transactions():
         print(f"❌ Error fetching or parsing Moralis API data: {e}")
         return []
 
-@tasks.loop(seconds=60)  # Check every 60 seconds
+@tasks.loop(seconds=120)  # Check every 60 seconds
 async def check_moralis_transactions():
     global last_seen_signature
 
