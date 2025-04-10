@@ -134,7 +134,6 @@ def fetch_latest_tiktok():
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         parsed = response.json()
-        print(f"📦 TikTok API Response: {parsed}")
 
         items = parsed.get("data", {}).get("itemList", [])
         if not items:
