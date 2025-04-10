@@ -4,6 +4,8 @@ import asyncio
 import requests
 import os
 from dotenv import load_dotenv
+import time
+from discord.ext import tasks
 
 print("🚀 Starting bot...", flush=True)
 
@@ -118,9 +120,78 @@ async def check_moralis_transactions():
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})", flush=True)
     check_moralis_transactions.start()
+    check_tiktok_upload.start()
     for guild in bot.guilds:
         print(f"📌 Connected to guild: {guild.name} (ID: {guild.id})", flush=True)
         for channel in guild.text_channels:
             print(f"   └─ 💬 {channel.name} (ID: {channel.id})", flush=True)
 
 bot.run(DISCORD_TOKEN)
+
+
+# TikTok API setup
+TIKTOK_API_HOST = "tiktok-api23.p.rapidapi.com"
+TIKTOK_API_KEY = "69ecd569acmsh0109968293cfa28p19897ajsn7c400e914f77"
+TIKTOK_SECUID = "MS4wLjABAAAAdaVuQdxR3JHOW8qSXEXZleD6Fv0eqmihFo1OWZ-PimB_SHSa6v3xLOnLyKi4JxcW"
+
+headers = {
+    "x-rapidapi-key": TIKTOK_API_KEY,
+    "x-rapidapi-host": TIKTOK_API_HOST,
+}
+
+last_video_id = None
+
+def fetch_latest_tiktok():
+    conn = http.client.HTTPSConnection(TIKTOK_API_HOST)
+    conn.request("GET", f"/api/user/posts?secUid={TIKTOK_SECUID}&count=1&cursor=0", headers=headers)
+    res = conn.getresponse()
+    data = res.read().decode("utf-8")
+
+    try:
+        import json
+        parsed = json.loads(data)
+        videos = parsed.get("data", {}).get("videos", [])
+        if not videos:
+            return None
+
+        latest = videos[0]
+        return {
+            "id": latest.get("id"),
+            "desc": latest.get("desc", "No description"),
+            "create_time": latest.get("createTime"),
+            "video_url": f"https://www.tiktok.com/@maybachidze__/video/{latest.get('id')}"
+        }
+    except Exception as e:
+        print(f"❌ Failed to parse TikTok API response: {e}")
+        return None
+
+@tasks.loop(minutes=10)
+async def check_tiktok_upload():
+    global last_video_id
+
+    print("🔁 Checking TikTok for new uploads...", flush=True)
+    latest_video = fetch_latest_tiktok()
+
+    if latest_video and latest_video["id"] != last_video_id:
+        last_video_id = latest_video["id"]
+        print(f"📹 New TikTok found: {latest_video['video_url']}", flush=True)
+
+        # Find the correct channel
+        for guild in bot.guilds:
+            for category in guild.categories:
+                if category.name.lower() == "news":
+                    for channel in category.text_channels:
+                        if channel.name == "maybach-content":
+                            embed = discord.Embed(
+                                title="🎥 New TikTok Uploaded!",
+                                description=latest_video["desc"],
+                                url=latest_video["video_url"],
+                                color=discord.Color.purple()
+                            )
+                            embed.add_field(name="Watch it here:", value=latest_video["video_url"], inline=False)
+                            embed.set_footer(text="Posted by @maybachidze__")
+
+                            await channel.send(embed=embed)
+                            return
+
+
