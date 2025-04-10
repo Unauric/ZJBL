@@ -134,6 +134,7 @@ def fetch_latest_tiktok():
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         parsed = response.json()
+        print(f"📦 TikTok API Response: {parsed}")
 
         videos = parsed.get("data", {}).get("videos", [])
         if not videos:
@@ -151,7 +152,7 @@ def fetch_latest_tiktok():
         return None
 
 
-@tasks.loop(minutes=10)
+@tasks.loop(minutes=1)
 async def check_tiktok_upload():
     global last_video_id
 
