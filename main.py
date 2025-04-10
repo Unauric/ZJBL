@@ -136,20 +136,34 @@ def fetch_latest_tiktok():
         parsed = response.json()
         print(f"📦 TikTok API Response: {parsed}")
 
-        videos = parsed.get("data", {}).get("videos", [])
-        if not videos:
+        items = parsed.get("data", {}).get("itemList", [])
+        if not items:
             return None
 
-        latest = videos[0]
+        latest = items[0]
+        post_id = latest.get("id")
+        desc = latest.get("desc", "No description")
+        create_time = latest.get("createTime")
+        post_url = f"https://www.tiktok.com/@maybachidze__/video/{post_id}"
+
+        if "video" in latest and latest["video"].get("duration", 0) > 0:
+            post_type = "🎥 Video"
+        elif "imagePost" in latest:
+            post_type = "🖼️ Photo Post"
+        else:
+            post_type = "📢 Post"
+
         return {
-            "id": latest.get("id"),
-            "desc": latest.get("desc", "No description"),
-            "create_time": latest.get("createTime"),
-            "video_url": f"https://www.tiktok.com/@maybachidze__/video/{latest.get('id')}"
+            "id": post_id,
+            "desc": desc,
+            "create_time": create_time,
+            "video_url": post_url,
+            "type": post_type
         }
     except Exception as e:
         print(f"❌ Failed to fetch or parse TikTok API response: {e}")
         return None
+
 
 
 @tasks.loop(minutes=1)
@@ -157,29 +171,29 @@ async def check_tiktok_upload():
     global last_video_id
 
     print("🔁 Checking TikTok for new uploads...", flush=True)
-    latest_video = fetch_latest_tiktok()
+    latest_post = fetch_latest_tiktok()
 
-    if latest_video and latest_video["id"] != last_video_id:
-        last_video_id = latest_video["id"]
-        print(f"📹 New TikTok found: {latest_video['video_url']}", flush=True)
+    if latest_post and latest_post["id"] != last_video_id:
+        last_video_id = latest_post["id"]
+        print(f"📹 New TikTok found: {latest_post['video_url']}", flush=True)
 
-        # Find the correct channel
         for guild in bot.guilds:
             for category in guild.categories:
                 if category.name.lower() == "news":
                     for channel in category.text_channels:
                         if channel.name == "maybach-content":
                             embed = discord.Embed(
-                                title="🎥 New TikTok Uploaded!",
-                                description=latest_video["desc"],
-                                url=latest_video["video_url"],
+                                title=f"{latest_post['type']} Uploaded!",
+                                description=latest_post["desc"],
+                                url=latest_post["video_url"],
                                 color=discord.Color.purple()
                             )
-                            embed.add_field(name="Watch it here:", value=latest_video["video_url"], inline=False)
+                            embed.add_field(name="Watch it here:", value=latest_post["video_url"], inline=False)
                             embed.set_footer(text="Posted by @maybachidze__")
 
                             await channel.send(embed=embed)
                             return
+
 
 
 
