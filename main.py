@@ -102,7 +102,7 @@ async def check_moralis_transactions():
         )
 
         # Set image (replace with a reliable image link)
-        embed.set_image(url="https://scontent.fvno1-1.fna.fbcdn.net/v/t39.30808-6/273730832_107107331960627_7929249299672926618_n.jpg")
+        embed.set_image(url="https://scontent.fkun1-2.fna.fbcdn.net/v/t39.30808-6/309910425_190715603352268_1954213668689896887_n.jpg?_nc_cat=101&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=wQqYsgpTnEAQ7kNvwEES1Is&_nc_oc=AdmALa_7ec36fguGqbiCAycN4zmLg-voCIcaJhxAaTnXX5YFW576gYTR2_BmUh5y8t4&_nc_zt=23&_nc_ht=scontent.fkun1-2.fna&_nc_gid=hsfifyaIPi0x_7etLMMK9g&oh=00_AfFcfMlPDsJja4NkhWCqME6c5fqCnr3BD60iQxmQbMjbKw&oe=67FDA704")
 
         print(f"📢 Sending embed to Discord...", flush=True)
 
