@@ -165,7 +165,7 @@ def fetch_latest_tiktok():
 
 
 
-@tasks.loop(minutes=1)
+@tasks.loop(minutes=10)
 async def check_tiktok_upload():
     global last_video_id
 
@@ -182,7 +182,7 @@ async def check_tiktok_upload():
                     for channel in category.text_channels:
                         if channel.name == "maybach-content":
                             embed = discord.Embed(
-                                title=f"{latest_post['type']} Uploaded!",
+                                title=f"💥NEW TIKTOK UPLOADED!💥",
                                 description=latest_post["desc"],
                                 url=latest_post["video_url"],
                                 color=discord.Color.purple()
