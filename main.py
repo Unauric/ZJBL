@@ -94,7 +94,7 @@ async def check_moralis_transactions():
 
         # Construct the message for buy transactions only
         msg = (
-            f"🚀 **New Buy on Solana Token!**\n"
+            f"🚀 **NEW BUY!**\n"
             f"👤 Buyer: [View Wallet](https://solscan.io/address/{wallet_address})\n"
             f"💰 Token: {token_name}\n"
             f"💵 Total Value: ${usd_amount}\n"
